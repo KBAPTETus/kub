@@ -1,0 +1,91 @@
+<resources>
+    <string name="app_name">kub</string>
+    <string name="app_subtitle">Финансовый радар для бизнеса</string>
+
+    <!-- Navigation tabs -->
+    <string name="nav_dashboard">Обзор</string>
+    <string name="nav_radar">Радар</string>
+    <string name="nav_taxes">Налоги</string>
+    <string name="nav_advisor">Анализ</string>
+
+    <!-- Onboarding & Mascot -->
+    <string name="onboarding_welcome_title">Привет, я kub!</string>
+    <string name="onboarding_welcome_desc">Твой персональный финансовый радар. Я контролирую 3 грани устойчивости бизнеса: не тратить чужие авансы (Безопасный остаток), копить налоги (Налоговая копилка) и видеть дефициты наперед (Кассовый радар).</string>
+    <string name="onboarding_balance_label">Фактический баланс бизнеса (₽)</string>
+    <string name="onboarding_balance_hint">Деньги на всех расчетных счетах и в кассе</string>
+    <string name="onboarding_regime_label">Система налогообложения</string>
+    <string name="onboarding_prior_revenue_label">Выручка с начала текущего года (₽)</string>
+    <string name="onboarding_prior_revenue_hint">Для контроля лимита 60 млн ₽ (порог НДС)</string>
+    <string name="onboarding_start_button">Погрузиться в kub</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Настройки kub</string>
+    <string name="settings_subtitle">Меняйте параметры под свое настроение в любой момент</string>
+    <string name="settings_save_button">Сохранить</string>
+    <string name="settings_reset_button">Сбросить и настроить заново</string>
+    <string name="settings_patent_cost_label">Стоимость патента за год (₽)</string>
+    <string name="settings_enp_reminders_label">Напоминания по ЕНС (25 и 28 числа)</string>
+
+    <!-- Dashboard -->
+    <string name="safe_to_spend_title">Безопасный остаток</string>
+    <string name="safe_to_spend_subtitle">Свободные деньги бизнеса сегодня</string>
+    <string name="actual_balance_label">Фактический баланс</string>
+    <string name="tax_reserve_label">Налоговая копилка</string>
+    <string name="client_advances_label">Незакрытые авансы</string>
+    <string name="upcoming_14d_label">Платежи (14 дней)</string>
+    <string name="action_add_transaction">Операция</string>
+    <string name="action_import_1c">Выписка 1С</string>
+    <string name="action_export_pnl">Экспорт P&amp;L</string>
+    <string name="action_set_balance">Нач. остаток</string>
+    <string name="recent_transactions_title">Операции и авансы</string>
+    <string name="filter_all">Все</string>
+    <string name="filter_income">Доходы</string>
+    <string name="filter_expense">Расходы</string>
+    <string name="filter_advances">Авансы</string>
+    <string name="empty_transactions_title">Пока нет операций</string>
+    <string name="empty_transactions_subtitle">Добавьте первую операцию вручную или загрузите банковскую выписку 1c_to_kl.txt (Т-Банк, Точка, Сбер, Альфа, ВТБ).</string>
+    <string name="close_advance_action">Закрыть акт</string>
+    <string name="advance_closed_badge">Акт закрыт</string>
+    <string name="advance_open_badge">Чужой аванс</string>
+    <string name="encrypted_badge">Локально · SQLCipher</string>
+
+    <!-- Cash Gap Radar -->
+    <string name="radar_title">Радар кассовых разрывов</string>
+    <string name="horizon_30d">30 дней</string>
+    <string name="horizon_90d">90 дней</string>
+    <string name="radar_no_gaps_title">Кассовых разрывов не предвидится</string>
+    <string name="radar_no_gaps_subtitle">Баланс остается положительным на всем горизонте прогноза</string>
+    <string name="scheduled_payments_title">Платежный календарь</string>
+    <string name="add_scheduled_payment">Плановый платеж</string>
+    <string name="empty_scheduled_title">Платежный календарь пуст</string>
+    <string name="empty_scheduled_subtitle">Добавьте регулярные расходы (аренда, ФОТ, налоги, поставщики) и ожидаемые поступления, чтобы увидеть прогноз баланса.</string>
+
+    <!-- Taxes -->
+    <string name="taxes_title">Налоговая копилка и ЕНС</string>
+    <string name="tax_regime_title">Налоговый режим</string>
+    <string name="regime_usn_6">УСН 6%</string>
+    <string name="regime_usn_15">УСН 15%</string>
+    <string name="regime_patent">Патент</string>
+    <string name="vat_threshold_title">Шкала порога НДС (60 млн ₽)</string>
+    <string name="enp_calendar_title">Календарь ЕНС (25 и 28 числа)</string>
+    <string name="enp_notifications_title">Уведомления за 5 и 1 день</string>
+    <string name="enp_notifications_subtitle">Локальные напоминания о подаче уведомления (25-го) и списании ЕНС (28-го)</string>
+    <string name="record_tax_payment">Зафиксировать уплату налога</string>
+
+    <!-- Financial Advisor -->
+    <string name="advisor_title">Анализ рисков и советы</string>
+    <string name="advisor_subtitle">Детерминированный расчет без облака</string>
+    <string name="health_score_title">Индекс устойчивости</string>
+    <string name="recommendations_title">Рекомендации kub</string>
+    <string name="tax_comparison_title">Сравнение режимов налогообложения</string>
+
+    <!-- Notifications -->
+    <string name="notification_channel_name">Налоги ЕНС и кассовые разрывы</string>
+    <string name="notification_channel_desc">Локальные оповещения о приближении 25/28 числа и риске кассового разрыва</string>
+
+    <!-- Content descriptions -->
+    <string name="cd_add_transaction">Добавить новую операцию</string>
+    <string name="cd_delete_item">Удалить запись</string>
+    <string name="cd_shift_payment">Перенести дату платежа</string>
+    <string name="cd_encryption_status">Локальное шифрование базы данных активно</string>
+</resources>

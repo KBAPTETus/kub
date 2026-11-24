@@ -1,0 +1,8 @@
+{
+  "name": "Remix Финдиректор",
+  "description": "Автономный мобильный финансовый аналитик для МСБ: Safe-to-Spend, налоговая копилка УСН, радар кассовых разрывов 30/90 дней и шифрованная БД Room + SQLCipher.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
