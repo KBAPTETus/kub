@@ -1,6 +1,7 @@
 package com.example.domain.usecase
 
 import com.example.data.local.ScheduledPaymentEntity
+import com.example.data.local.TaxProfileEntity
 import com.example.data.local.TransactionEntity
 import com.example.data.model.PaymentDirection
 import com.example.data.model.TaxRegime
@@ -25,7 +26,8 @@ class AnalyzeFinancialRisksUseCase {
         taxSummary: TaxSummary,
         scheduledPayments: List<ScheduledPaymentEntity>,
         transactions: List<TransactionEntity>,
-        todayEpochDay: Long = DateUtil.todayEpochDay()
+        todayEpochDay: Long = DateUtil.todayEpochDay(),
+        taxProfile: TaxProfileEntity = TaxProfileEntity()
     ): FinancialHealthReport {
         // Calculate daily burn rate based on next 30 days scheduled outflows
         val next30DaysOutflows = scheduledPayments
@@ -131,7 +133,13 @@ class AnalyzeFinancialRisksUseCase {
         }
 
         // 3. Tax regime comparison
-        val comparisons = calculateTaxComparisons(taxSummary.totalYearRevenueKopecks, safeToSpend.totalExpensesKopecks, taxSummary.regime)
+        val monthsElapsed = DateUtil.monthOf(todayEpochDay).coerceIn(1, 12)
+        val comparisons = calculateTaxComparisons(
+            totalRevenue = taxSummary.totalYearRevenueKopecks,
+            totalExpenses = safeToSpend.totalExpensesKopecks,
+            profile = taxProfile,
+            monthsElapsed = monthsElapsed
+        )
         val bestOption = comparisons.minByOrNull { it.estimatedTaxKopecks }
         if (bestOption != null && bestOption.regime != taxSummary.regime && bestOption.diffKopecksVsCurrent < -50_000_00L) {
             val savings = kotlin.math.abs(bestOption.diffKopecksVsCurrent)
@@ -172,41 +180,32 @@ class AnalyzeFinancialRisksUseCase {
     private fun calculateTaxComparisons(
         totalRevenue: Long,
         totalExpenses: Long,
-        currentRegime: TaxRegime
+        profile: TaxProfileEntity,
+        monthsElapsed: Int
     ): List<TaxRegimeComparison> {
-        val taxUsn6 = (totalRevenue * 6L) / 100L
-
-        val netMargin = max(0L, totalRevenue - totalExpenses)
-        val taxUsn15 = max((netMargin * 15L) / 100L, (totalRevenue * 1L) / 100L)
-
-        // Estimated average patent reference (120 000 ₽ / year)
-        val taxPatent = 120_000_00L
-
-        val currentTax = when (currentRegime) {
-            TaxRegime.USN_6 -> taxUsn6
-            TaxRegime.USN_15 -> taxUsn15
-            TaxRegime.PATENT -> taxPatent
-        }
-
-        return listOf(
-            TaxRegimeComparison(
-                regime = TaxRegime.USN_6,
-                estimatedTaxKopecks = taxUsn6,
-                isCurrent = currentRegime == TaxRegime.USN_6,
-                diffKopecksVsCurrent = taxUsn6 - currentTax
-            ),
-            TaxRegimeComparison(
-                regime = TaxRegime.USN_15,
-                estimatedTaxKopecks = taxUsn15,
-                isCurrent = currentRegime == TaxRegime.USN_15,
-                diffKopecksVsCurrent = taxUsn15 - currentTax
-            ),
-            TaxRegimeComparison(
-                regime = TaxRegime.PATENT,
-                estimatedTaxKopecks = taxPatent,
-                isCurrent = currentRegime == TaxRegime.PATENT,
-                diffKopecksVsCurrent = taxPatent - currentTax
-            )
+        val currentRegime = profile.regime
+        val currentTax = TaxCalculator.calculateTaxAmount(
+            regime = currentRegime,
+            revenueKopecks = totalRevenue,
+            expensesKopecks = totalExpenses,
+            profile = profile,
+            monthsElapsed = monthsElapsed
         )
+
+        return TaxRegime.entries.map { regime ->
+            val estimated = TaxCalculator.calculateTaxAmount(
+                regime = regime,
+                revenueKopecks = totalRevenue,
+                expensesKopecks = totalExpenses,
+                profile = profile,
+                monthsElapsed = monthsElapsed
+            )
+            TaxRegimeComparison(
+                regime = regime,
+                estimatedTaxKopecks = estimated,
+                isCurrent = regime == currentRegime,
+                diffKopecksVsCurrent = estimated - currentTax
+            )
+        }
     }
 }

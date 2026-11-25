@@ -11,9 +11,11 @@ import com.example.data.model.TransactionType
 import com.example.domain.model.ActionType
 import com.example.domain.model.RiskLevel
 import com.example.domain.usecase.AnalyzeFinancialRisksUseCase
+import com.example.domain.usecase.BackupRestoreUseCase
 import com.example.domain.usecase.CalculateSafeToSpendUseCase
 import com.example.domain.usecase.CalculateTaxReserveUseCase
-import com.example.domain.usecase.Parse1CBankStatementUseCase
+import com.example.domain.usecase.KubBackupData
+import com.example.domain.usecase.ParseBankCsvUseCase
 import com.example.domain.usecase.PredictCashGapsUseCase
 import com.example.domain.util.DateUtil
 import com.example.domain.util.MoneyFormatter
@@ -23,13 +25,13 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
 
 class FinanceEngineUnitTest {
 
     private val calculateSafeToSpendUC = CalculateSafeToSpendUseCase()
     private val predictCashGapsUC = PredictCashGapsUseCase()
     private val calculateTaxReserveUC = CalculateTaxReserveUseCase()
-    private val parse1CBankStatementUC = Parse1CBankStatementUseCase()
     private val analyzeFinancialRisksUC = AnalyzeFinancialRisksUseCase()
 
     private val today = DateUtil.toEpochDay(2026, 11, 24)
@@ -145,62 +147,6 @@ class FinanceEngineUnitTest {
     }
 
     @Test
-    fun testParse1CBankStatement_extractsTransactions() {
-        val sample1C = """
-            1CClientBankExchange
-            ВерсияФормата=1.03
-            Кодировка=Windows
-            Отправитель=ПАО СБЕРБАНК
-            ДатаСоздания=24.11.2026
-            ВремяСоздания=14:00:00
-            СекцияРасчСчет
-            РасчСчет=40802810938000000001
-            КонецРасчСчет
-            СекцияДокумент=Платежное поручение
-            Номер=45
-            Дата=20.11.2026
-            Сумма=150000.00
-            Плательщик=ООО "Партнер"
-            ПлательщикИНН=7701234567
-            ПлательщикРасчСчет=40702810000000000002
-            Получатель=ИП Иванов Иван Иванович
-            ПолучательИНН=770987654321
-            ПолучательРасчСчет=40802810938000000001
-            НазначениеПлатежа=Аванс по договору оказания услуг № 12 от 15.11.2026
-            КонецДокумента
-            СекцияДокумент=Платежное поручение
-            Номер=46
-            Дата=22.11.2026
-            Сумма=45000.00
-            Плательщик=ИП Иванов Иван Иванович
-            ПлательщикИНН=770987654321
-            ПлательщикРасчСчет=40802810938000000001
-            Получатель=ООО "Арендатор"
-            ПолучательИНН=7705555555
-            ПолучательРасчСчет=40702810000000000003
-            НазначениеПлатежа=Оплата аренды офиса за ноябрь 2026 года
-            КонецДокумента
-        """.trimIndent()
-
-        val bytes = sample1C.toByteArray(java.nio.charset.Charset.forName("windows-1251"))
-        val txs = parse1CBankStatementUC.execute(ByteArrayInputStream(bytes))
-
-        assertEquals(2, txs.size)
-
-        val advanceTx = txs[0]
-        assertEquals(TransactionType.CLIENT_ADVANCE, advanceTx.type)
-        assertEquals(150_000_00L, advanceTx.amountKopecks)
-        assertEquals("ООО \"Партнер\"", advanceTx.counterparty)
-        assertNotNull(advanceTx.externalDocHash)
-
-        val expenseTx = txs[1]
-        assertEquals(TransactionType.EXPENSE, expenseTx.type)
-        assertEquals(45_000_00L, expenseTx.amountKopecks)
-        assertEquals("ООО \"Арендатор\"", expenseTx.counterparty)
-        assertEquals("Аренда", expenseTx.category)
-    }
-
-    @Test
     fun testTaxReserveAnd60MLimit() {
         val profile = TaxProfileEntity(
             regime = TaxRegime.USN_6,
@@ -308,5 +254,112 @@ class FinanceEngineUnitTest {
         assertEquals("−500 ₽", MoneyFormatter.formatRubles(-500_00L))
         assertEquals(150_000_00L, MoneyFormatter.parseRublesToKopecks("150000"))
         assertEquals(25_500_00L, MoneyFormatter.parseRublesToKopecks("25 500,00 ₽"))
+    }
+
+    @Test
+    fun testSafeToSpendAndTaxReserve_consistentWithRegionalRatesAndTaxPayment() {
+        val profile = TaxProfileEntity(
+            regime = TaxRegime.USN_6,
+            initialBalanceKopecks = 1_000_000_00L,
+            priorYearIncomeKopecks = 500_000_00L,
+            usnIncomeRatePercent = 1.0f // 1% regional rate
+        )
+        val txs = listOf(
+            TransactionEntity(
+                id = 1,
+                amountKopecks = 500_000_00L,
+                dateEpochDay = today,
+                type = TransactionType.INCOME,
+                counterparty = "Клиент",
+                purpose = "Услуги",
+                category = "Выручка"
+            )
+        )
+        val taxPayments = listOf(
+            TaxPaymentEntity(
+                id = 1,
+                amountKopecks = 4_000_00L,
+                dateEpochDay = today,
+                note = "Авансовый платёж УСН"
+            )
+        )
+
+        val safe = calculateSafeToSpendUC.execute(txs, emptyList(), profile, taxPayments, today)
+        val taxSummary = calculateTaxReserveUC.execute(txs, profile, taxPayments, today)
+
+        // 1% of (500k prior + 500k tx) = 10 000 ₽ accrued; minus 4 000 ₽ paid = 6 000 ₽ reserve
+        assertEquals(10_000_00L, taxSummary.accruedTaxKopecks)
+        assertEquals(6_000_00L, taxSummary.taxReserveKopecks)
+        assertEquals(taxSummary.taxReserveKopecks, safe.taxReserveKopecks)
+    }
+
+    @Test
+    fun testNpdRegimeAndMonthly31stCashGap() {
+        val npdProfile = TaxProfileEntity(regime = TaxRegime.NPD, npdRatePercent = 4.0f)
+        val txs = listOf(
+            TransactionEntity(
+                id = 1,
+                amountKopecks = 100_000_00L,
+                dateEpochDay = today,
+                type = TransactionType.INCOME,
+                counterparty = "Физлицо",
+                purpose = "Консультация",
+                category = "Услуги"
+            )
+        )
+        val taxSummary = calculateTaxReserveUC.execute(txs, npdProfile, emptyList(), today)
+        assertEquals(4_000_00L, taxSummary.accruedTaxKopecks)
+        assertEquals(CalculateTaxReserveUseCase.LIMIT_NPD_KOPECKS, taxSummary.annualLimitKopecks)
+
+        // Monthly payment scheduled on Jan 31 should trigger on Feb 28 in non-leap year
+        val jan31 = DateUtil.toEpochDay(2026, 1, 31)
+        val payment = ScheduledPaymentEntity(
+            id = 1,
+            title = "Аренда",
+            amountKopecks = 200_000_00L,
+            direction = PaymentDirection.OUTFLOW,
+            dueDateEpochDay = jan31,
+            recurrence = PaymentRecurrence.MONTHLY,
+            category = "Аренда",
+            isActive = true
+        )
+        val forecast = predictCashGapsUC.execute(
+            actualBalanceKopecks = 100_000_00L,
+            scheduledPayments = listOf(payment),
+            horizonDays = 35,
+            todayEpochDay = DateUtil.toEpochDay(2026, 2, 1)
+        )
+        assertTrue(forecast.hasGap)
+        assertEquals(DateUtil.toEpochDay(2026, 2, 28), forecast.firstGapDateEpochDay)
+    }
+
+    @Test
+    fun testParseBankCsv_andBackupRestore() {
+        val csv = "\uFEFFДата операции;Сумма;Контрагент;Назначение платежа\n" +
+            "24.11.2026;150 000,00;ООО Альфа;Аванс по договору №12\n" +
+            "25.11.2026;-45000.50;ООО Бета;Оплата аренды\n"
+        val parsed = ParseBankCsvUseCase().execute(ByteArrayInputStream(csv.toByteArray(Charsets.UTF_8)))
+        assertEquals(2, parsed.size)
+        assertEquals(TransactionType.CLIENT_ADVANCE, parsed[0].type)
+        assertEquals(150_000_00L, parsed[0].amountKopecks)
+        assertEquals(TransactionType.EXPENSE, parsed[1].type)
+        assertEquals(45_000_50L, parsed[1].amountKopecks)
+        assertNotNull(parsed[0].externalDocHash)
+
+        val backupUC = BackupRestoreUseCase()
+        val out = ByteArrayOutputStream()
+        backupUC.exportJson(
+            KubBackupData(
+                profile = TaxProfileEntity(userName = "Иван", usnIncomeRatePercent = 3.0f),
+                transactions = parsed,
+                scheduledPayments = emptyList(),
+                taxPayments = emptyList()
+            ),
+            out
+        )
+        val restored = backupUC.importJson(ByteArrayInputStream(out.toByteArray()))
+        assertEquals("Иван", restored.profile.userName)
+        assertEquals(3.0f, restored.profile.usnIncomeRatePercent, 0.01f)
+        assertEquals(2, restored.transactions.size)
     }
 }

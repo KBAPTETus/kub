@@ -46,10 +46,15 @@ data class ScheduledPaymentEntity(
 @Entity(tableName = "tax_profile")
 data class TaxProfileEntity(
     @PrimaryKey val id: Int = 1,
+    val userName: String = "",
+    val isDarkTheme: Boolean = false,
     val regime: TaxRegime = TaxRegime.USN_6,
     val initialBalanceKopecks: Long = 0L,
     val annualPatentCostKopecks: Long = 120_000_00L, // 120 000 ₽ default reference
     val priorYearIncomeKopecks: Long = 0L, // Revenue recorded before app usage in current calendar year
+    val usnIncomeRatePercent: Float = 6.0f, // Regional USN "Income" rate (default 6%)
+    val usnMarginRatePercent: Float = 15.0f, // Regional USN "Income - Expenses" rate (default 15%)
+    val npdRatePercent: Float = 6.0f, // Self-employed NPD rate (4% B2C / 6% B2B)
     val enpRemindersEnabled: Boolean = false,
     val isOnboardingCompleted: Boolean = false,
     val updatedAtMillis: Long = System.currentTimeMillis()

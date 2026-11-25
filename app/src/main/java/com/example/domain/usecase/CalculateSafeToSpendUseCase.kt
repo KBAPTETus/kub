@@ -48,25 +48,14 @@ class CalculateSafeToSpendUseCase {
         val actualBalance = taxProfile.initialBalanceKopecks +
                 totalIncomes + totalAdvances - totalExpenses - totalTaxPaid
 
-        // Tax calculation
         val totalRevenue = totalIncomes + totalAdvances
-        val accruedTax = when (taxProfile.regime) {
-            TaxRegime.USN_6 -> {
-                (totalRevenue * 6L) / 100L
-            }
-            TaxRegime.USN_15 -> {
-                val netIncome = max(0L, totalRevenue - totalExpenses)
-                val standard15 = (netIncome * 15L) / 100L
-                val minTax1 = (totalRevenue * 1L) / 100L
-                max(standard15, minTax1)
-            }
-            TaxRegime.PATENT -> {
-                val currentMonth = DateUtil.monthOf(todayEpochDay).coerceIn(1, 12)
-                (taxProfile.annualPatentCostKopecks * currentMonth.toLong()) / 12L
-            }
-        }
-
-        val taxReserve = max(0L, accruedTax - totalTaxPaid)
+        val yearTax = TaxCalculator.calculateYearTax(
+            transactions = transactions,
+            taxProfile = taxProfile,
+            taxPayments = taxPayments,
+            todayEpochDay = todayEpochDay
+        )
+        val taxReserve = yearTax.taxReserveKopecks
 
         // 14-day upcoming expenses buffer
         val bufferEndEpochDay = todayEpochDay + 14L

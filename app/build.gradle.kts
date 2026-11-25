@@ -17,7 +17,7 @@ android {
     minSdk = 24
     targetSdk = 36
     versionCode = 1
-    versionName = "1.0"
+    versionName = "beta0.1"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
@@ -61,7 +61,12 @@ android {
     compose = true
     buildConfig = true
   }
-  testOptions { unitTests { isIncludeAndroidResources = true } }
+  testOptions {
+    unitTests {
+      isIncludeAndroidResources = true
+      all { it.maxHeapSize = "1536m" }
+    }
+  }
   dependenciesInfo {
     includeInApk = false
     includeInBundle = true
@@ -106,6 +111,7 @@ dependencies {
   implementation(libs.sqlcipher.android)
   implementation(libs.androidx.sqlite)
   implementation(libs.androidx.work.runtime.ktx)
+  implementation(libs.yandex.mobileads)
   // implementation(libs.coil.compose)
   // implementation(libs.converter.moshi)
   // implementation(libs.firebase.ai)

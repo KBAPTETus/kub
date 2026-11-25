@@ -1,7 +1,9 @@
 package com.example.ui.screens
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,52 +12,49 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.Lightbulb
-import androidx.compose.material.icons.filled.Shield
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.example.ads.KubAdConfig
 import com.example.data.model.TaxRegime
-import com.example.domain.model.ActionType
-import com.example.domain.model.Recommendation
 import com.example.domain.model.RiskLevel
-import com.example.domain.util.DateUtil
 import com.example.domain.util.MoneyFormatter
 import com.example.ui.MainUiState
-import com.example.ui.components.KubMascotBadge
+import com.example.ui.components.AeroGlassCard
+import com.example.ui.components.AeroPrimaryButton
+import com.example.ui.components.KubIndexRing
+import com.example.ui.components.KubNativeAdCard
 import com.example.ui.components.StatusBadge
-import com.example.ui.theme.KubAbyssNavy
-import com.example.ui.theme.KubDangerCoral
-import com.example.ui.theme.KubDangerCoralContainer
-import com.example.ui.theme.KubIceGlacier
 import com.example.ui.theme.KubMarineCobalt
 import com.example.ui.theme.KubOceanSurface
-import com.example.ui.theme.KubSafeAqua
-import com.example.ui.theme.KubSafeAquaContainer
-import com.example.ui.theme.KubSkyMarine
-import com.example.ui.theme.KubWarningAmber
-import com.example.ui.theme.KubWarningAmberContainer
+import com.example.ui.theme.LocalKubAeroTokens
+import kotlin.math.abs
 
 @Composable
 fun AnalyticsScreen(
@@ -64,212 +63,302 @@ fun AnalyticsScreen(
     onSelectRegime: (TaxRegime) -> Unit,
     onGoToTab: (Int) -> Unit,
     onExportPnlCsv: () -> Unit,
+    onUpdateRegionalTaxRates: (
+        usnIncomeRate: Float,
+        usnMarginRate: Float,
+        npdRate: Float,
+        annualPatentCostKopecks: Long
+    ) -> Unit = { _, _, _, _ -> },
     modifier: Modifier = Modifier
 ) {
     val report = state.healthReport
+    val profile = state.taxProfile
+    val tokens = LocalKubAeroTokens.current
+
+    var showRegionalEditor by remember { mutableStateOf(false) }
+    var usn6Text by remember(profile.usnIncomeRatePercent) {
+        mutableStateOf(formatRate(profile.usnIncomeRatePercent))
+    }
+    var usn15Text by remember(profile.usnMarginRatePercent) {
+        mutableStateOf(formatRate(profile.usnMarginRatePercent))
+    }
+    var npdRate by remember(profile.npdRatePercent) {
+        mutableStateOf(profile.npdRatePercent)
+    }
+    var patentCostText by remember(profile.annualPatentCostKopecks) {
+        mutableStateOf((profile.annualPatentCostKopecks / 100L).toString())
+    }
 
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
             .padding(horizontal = 16.dp),
-        contentPadding = PaddingValues(vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        contentPadding = PaddingValues(top = 12.dp, bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        // Business Stability Index & Runway
+        // Ring Score + Status Badge (without Runway or captain advice)
         item {
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(1.dp, KubMarineCobalt.copy(alpha = 0.5f), RoundedCornerShape(20.dp)),
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = KubOceanSurface)
-            ) {
-                Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            AeroGlassCard(cornerRadius = 24.dp) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    KubIndexRing(
+                        score = report.stabilityIndex,
+                        level = report.riskLevel
+                    )
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        StatusBadge(level = report.riskLevel)
+                        Text(
+                            text = when (report.riskLevel) {
+                                RiskLevel.HEALTHY -> "Финансовая устойчивость в норме. Дефицит на горизонте не прогнозируется."
+                                RiskLevel.ATTENTION -> "Есть зоны риска по календарю платежей. Проверьте график во вкладке «Радар»."
+                                RiskLevel.CRITICAL -> "Высокая нагрузка на остаток. Рекомендуется пересмотреть ближайшие списания."
+                            },
+                            style = MaterialTheme.typography.labelSmall,
+                            color = tokens.textMuted
+                        )
+                    }
+                }
+            }
+        }
+
+        // Tax Regime Comparison & Regional Rate Calibration Card
+        item {
+            AeroGlassCard(cornerRadius = 24.dp) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            "ИНДЕКС УСТОЙЧИВОСТИ БИЗНЕСА",
-                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                            color = KubSkyMarine
-                        )
-                        StatusBadge(level = report.riskLevel)
-                    }
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(KubAbyssNavy)
-                                .border(1.dp, KubMarineCobalt.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
-                                .padding(16.dp)
-                        ) {
-                            Column {
-                                Text("Индекс kub", style = MaterialTheme.typography.labelSmall, color = KubSkyMarine)
-                                Text(
-                                    "${report.stabilityIndex} / 100",
-                                    style = MaterialTheme.typography.headlineMedium.copy(
-                                        fontWeight = FontWeight.Bold,
-                                        fontFamily = FontFamily.Monospace
-                                    ),
-                                    color = when (report.riskLevel) {
-                                        RiskLevel.HEALTHY -> KubSafeAqua
-                                        RiskLevel.ATTENTION -> KubWarningAmber
-                                        RiskLevel.CRITICAL -> KubDangerCoral
-                                    }
-                                )
-                                Text(
-                                    when (report.riskLevel) {
-                                        RiskLevel.HEALTHY -> "Высокая прочность"
-                                        RiskLevel.ATTENTION -> "Требуется контроль"
-                                        RiskLevel.CRITICAL -> "Угроза дефицита"
-                                    },
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = KubSkyMarine
-                                )
-                            }
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "НАЛОГОВАЯ НАГРУЗКА",
+                                style = MaterialTheme.typography.labelMedium.copy(
+                                    fontWeight = FontWeight.ExtraBold,
+                                    letterSpacing = 0.8.sp
+                                ),
+                                color = tokens.textSub
+                            )
+                            Text(
+                                text = "Сравнение режимов с учётом региональных ставок",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = tokens.textMuted
+                            )
                         }
-
                         Box(
                             modifier = Modifier
-                                .weight(1f)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(KubAbyssNavy)
-                                .border(1.dp, KubMarineCobalt.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
-                                .padding(16.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(tokens.pillBg)
+                                .border(1.dp, tokens.glassBorder, RoundedCornerShape(10.dp))
+                                .clickable { showRegionalEditor = !showRegionalEditor }
+                                .padding(horizontal = 10.dp, vertical = 6.dp)
                         ) {
-                            Column {
-                                Text("Запас прочности (Runway)", style = MaterialTheme.typography.labelSmall, color = KubSkyMarine)
-                                Text(
-                                    DateUtil.daysRu(report.runwayDays),
-                                    style = MaterialTheme.typography.headlineMedium.copy(
-                                        fontWeight = FontWeight.Bold,
-                                        fontFamily = FontFamily.Monospace
-                                    ),
-                                    color = if (report.runwayDays < 14) KubDangerCoral else KubIceGlacier
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Tune,
+                                    contentDescription = "Настроить ставки региона",
+                                    tint = tokens.textSub,
+                                    modifier = Modifier.size(14.dp)
                                 )
                                 Text(
-                                    "Хватит денег без выручки",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = KubSkyMarine
+                                    text = if (showRegionalEditor) "Скрыть" else "Ставки",
+                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                    color = tokens.textSub
                                 )
                             }
                         }
                     }
-                }
-            }
-        }
 
-        // Actionable Recommendations Header with Mascot
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                KubMascotBadge(size = 28.dp)
-                Text(
-                    "СОВЕТЫ KUB (${report.recommendations.size})",
-                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                    color = KubSkyMarine
-                )
-            }
-        }
+                    report.taxRegimeComparisons.forEach { cmp ->
+                        val diffText = when {
+                            cmp.isCurrent -> "Текущий"
+                            cmp.diffKopecksVsCurrent < 0L -> "−${MoneyFormatter.formatRubles(abs(cmp.diffKopecksVsCurrent))}"
+                            cmp.diffKopecksVsCurrent > 0L -> "+${MoneyFormatter.formatRubles(cmp.diffKopecksVsCurrent)}"
+                            else -> "0 ₽"
+                        }
+                        val diffColor = when {
+                            cmp.isCurrent -> tokens.textSub
+                            cmp.diffKopecksVsCurrent < 0L -> tokens.safeColor
+                            else -> tokens.dangerColor
+                        }
+                        val rateSuffix = when (cmp.regime) {
+                            TaxRegime.USN_6 -> "${formatRate(profile.usnIncomeRatePercent)}%"
+                            TaxRegime.USN_15 -> "${formatRate(profile.usnMarginRatePercent)}%"
+                            TaxRegime.PATENT -> "год"
+                            TaxRegime.NPD -> "${formatRate(profile.npdRatePercent)}%"
+                        }
 
-        if (report.recommendations.isEmpty()) {
-            item {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .border(1.dp, KubSafeAqua.copy(alpha = 0.3f), RoundedCornerShape(14.dp)),
-                    colors = CardDefaults.cardColors(containerColor = KubSafeAquaContainer),
-                    shape = RoundedCornerShape(14.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Icon(imageVector = Icons.Default.Shield, contentDescription = null, tint = KubSafeAqua)
-                        Text(
-                            "Финансовые риски не выявлены. kub держит баланс под контролем!",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = KubSafeAqua
-                        )
-                    }
-                }
-            }
-        } else {
-            items(report.recommendations, key = { it.id }) { rec ->
-                RecommendationCard(
-                    recommendation = rec,
-                    onShiftPayment = onShiftPayment,
-                    onSelectRegime = onSelectRegime,
-                    onGoToTab = onGoToTab
-                )
-            }
-        }
-
-        // Tax Regime Comparison Table
-        item {
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(1.dp, KubMarineCobalt.copy(alpha = 0.4f), RoundedCornerShape(16.dp)),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = KubOceanSurface)
-            ) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(
-                        "СРАВНЕНИЕ ВЫГОДНОСТИ РЕЖИМОВ",
-                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                        color = KubSkyMarine
-                    )
-
-                    report.taxRegimeComparisons.forEach { comp ->
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(if (comp.isCurrent) KubAbyssNavy else Color.Transparent)
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(if (cmp.isCurrent) KubMarineCobalt.copy(alpha = 0.14f) else tokens.cardInner)
                                 .border(
                                     1.dp,
-                                    if (comp.isCurrent) KubMarineCobalt.copy(alpha = 0.5f) else Color.Transparent,
-                                    RoundedCornerShape(8.dp)
+                                    if (cmp.isCurrent) KubMarineCobalt.copy(alpha = 0.45f) else tokens.glassBorder,
+                                    RoundedCornerShape(14.dp)
                                 )
-                                .padding(horizontal = 10.dp, vertical = 8.dp),
+                                .clickable { onSelectRegime(cmp.regime) }
+                                .padding(horizontal = 12.dp, vertical = 10.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Column {
-                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    Text(
-                                        comp.regime.shortTitle,
-                                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-                                        color = if (comp.isCurrent) KubIceGlacier else KubSkyMarine
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "${cmp.regime.shortTitle} ($rateSuffix)",
+                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.ExtraBold),
+                                    color = tokens.textMain
+                                )
+                                Text(
+                                    text = MoneyFormatter.formatRubles(cmp.estimatedTaxKopecks),
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontFamily = FontFamily.Monospace,
+                                        fontWeight = FontWeight.SemiBold
+                                    ),
+                                    color = tokens.textSub
+                                )
+                            }
+
+                            Box(
+                                modifier = Modifier
+                                    .clip(CircleShape)
+                                    .background(
+                                        if (cmp.isCurrent) tokens.pillBg
+                                        else if (cmp.diffKopecksVsCurrent < 0L) tokens.safeBg
+                                        else tokens.dangerBg
                                     )
-                                    if (comp.isCurrent) {
-                                        Text(
-                                            "(Текущий)",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = KubIceGlacier
-                                        )
+                                    .padding(horizontal = 9.dp, vertical = 4.dp)
+                            ) {
+                                Text(
+                                    text = diffText,
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        fontFamily = FontFamily.Monospace
+                                    ),
+                                    color = diffColor
+                                )
+                            }
+                        }
+                    }
+
+                    AnimatedVisibility(visible = showRegionalEditor) {
+                        val fieldColors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = KubMarineCobalt,
+                            unfocusedBorderColor = tokens.glassBorder,
+                            focusedTextColor = tokens.textMain,
+                            unfocusedTextColor = tokens.textMain,
+                            focusedContainerColor = tokens.inputBg,
+                            unfocusedContainerColor = tokens.inputBg
+                        )
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(tokens.cardInner)
+                                .border(1.dp, tokens.glassBorder, RoundedCornerShape(16.dp))
+                                .padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                text = "Региональная корректировка ставок",
+                                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.ExtraBold),
+                                color = tokens.textMain
+                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                OutlinedTextField(
+                                    value = usn6Text,
+                                    onValueChange = { usn6Text = it },
+                                    label = { Text("УСН Доходы %", fontSize = 11.sp) },
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                    singleLine = true,
+                                    colors = fieldColors,
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier.weight(1f)
+                                )
+                                OutlinedTextField(
+                                    value = usn15Text,
+                                    onValueChange = { usn15Text = it },
+                                    label = { Text("УСН Д−Р %", fontSize = 11.sp) },
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                    singleLine = true,
+                                    colors = fieldColors,
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                            OutlinedTextField(
+                                value = patentCostText,
+                                onValueChange = { patentCostText = it },
+                                label = { Text("Патент в регионе (₽ / год)", fontSize = 11.sp) },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                singleLine = true,
+                                colors = fieldColors,
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = "Ставка НПД:",
+                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                    color = tokens.textSub
+                                )
+                                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    listOf(4.0f to "4% (физлица)", 6.0f to "6% (ИП/ООО)").forEach { (rate, label) ->
+                                        val selected = abs(npdRate - rate) < 0.05f
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(10.dp))
+                                                .background(if (selected) KubOceanSurface else tokens.pillBg)
+                                                .border(1.dp, tokens.glassBorder, RoundedCornerShape(10.dp))
+                                                .clickable { npdRate = rate }
+                                                .padding(horizontal = 10.dp, vertical = 6.dp)
+                                        ) {
+                                            Text(
+                                                text = label,
+                                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                                color = if (selected) Color.White else tokens.textMain
+                                            )
+                                        }
                                     }
                                 }
                             }
-                            Text(
-                                MoneyFormatter.formatRubles(comp.estimatedTaxKopecks),
-                                style = MaterialTheme.typography.bodyMedium.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    fontFamily = FontFamily.Monospace
-                                ),
-                                color = if (comp.isCurrent) KubSafeAqua else KubSkyMarine
+                            AeroPrimaryButton(
+                                text = "Сохранить ставки региона",
+                                onClick = {
+                                    val r6 = usn6Text.replace(",", ".").toFloatOrNull()?.coerceIn(0f, 100f)
+                                        ?: profile.usnIncomeRatePercent
+                                    val r15 = usn15Text.replace(",", ".").toFloatOrNull()?.coerceIn(0f, 100f)
+                                        ?: profile.usnMarginRatePercent
+                                    val pat = MoneyFormatter.parseRublesToKopecks(patentCostText)
+                                        ?: profile.annualPatentCostKopecks
+                                    onUpdateRegionalTaxRates(r6, r15, npdRate, pat)
+                                    showRegionalEditor = false
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                contentPadding = PaddingValues(vertical = 10.dp)
                             )
                         }
                     }
@@ -277,131 +366,33 @@ fun AnalyticsScreen(
             }
         }
 
-        // Export P&L Report
+        // Primary Aero CTA: Export P&L CSV
         item {
-            Button(
+            AeroPrimaryButton(
+                text = "Выгрузить отчёт P&L в CSV",
                 onClick = onExportPnlCsv,
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = KubIceGlacier,
-                    contentColor = KubAbyssNavy
-                )
-            ) {
-                Icon(imageVector = Icons.Default.Download, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    "Экспорт отчета P&L в Excel (CSV)",
-                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
-                )
-            }
+                contentPadding = PaddingValues(vertical = 15.dp),
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Default.Description,
+                        contentDescription = null,
+                        tint = tokens.btnPrimaryText,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            )
+        }
+
+        // Native RSY Ad Card below CSV Export CTA
+        item {
+            KubNativeAdCard(
+                adUnitId = KubAdConfig.nativeAdUnitId
+            )
         }
     }
 }
 
-@Composable
-private fun RecommendationCard(
-    recommendation: Recommendation,
-    onShiftPayment: (Long, Long) -> Unit,
-    onSelectRegime: (TaxRegime) -> Unit,
-    onGoToTab: (Int) -> Unit
-) {
-    val borderColor = when (recommendation.riskLevel) {
-        RiskLevel.CRITICAL -> KubDangerCoral.copy(alpha = 0.6f)
-        RiskLevel.ATTENTION -> KubWarningAmber.copy(alpha = 0.6f)
-        RiskLevel.HEALTHY -> KubSafeAqua.copy(alpha = 0.6f)
-    }
-
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .border(1.dp, borderColor, RoundedCornerShape(12.dp)),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = KubOceanSurface)
-    ) {
-        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Lightbulb,
-                    contentDescription = null,
-                    tint = borderColor,
-                    modifier = Modifier.size(20.dp)
-                )
-                Text(
-                    text = recommendation.title,
-                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-                    color = KubIceGlacier
-                )
-            }
-
-            Text(
-                text = recommendation.description,
-                style = MaterialTheme.typography.bodySmall,
-                color = KubSkyMarine
-            )
-
-            // Action button according to actionType
-            when (recommendation.actionType) {
-                ActionType.SHIFT_PAYMENT -> {
-                    val targetId = recommendation.targetPaymentId
-                    val shiftDays = recommendation.suggestedShiftDays ?: 5
-                    val targetDate = recommendation.suggestedDateEpochDay
-                    if (targetId != null && targetDate != null) {
-                        Button(
-                            onClick = { onShiftPayment(targetId, targetDate) },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(8.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = KubMarineCobalt,
-                                contentColor = KubIceGlacier
-                            )
-                        ) {
-                            Text(
-                                "Сдвинуть срок на +$shiftDays дн",
-                                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
-                            )
-                        }
-                    }
-                }
-                ActionType.CHANGE_TAX_REGIME -> {
-                    recommendation.targetRegime?.let { regime ->
-                        Button(
-                            onClick = { onSelectRegime(regime) },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(8.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = KubMarineCobalt,
-                                contentColor = KubIceGlacier
-                            )
-                        ) {
-                            Text(
-                                "Переключить на ${regime.shortTitle}",
-                                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
-                            )
-                        }
-                    }
-                }
-                ActionType.CLOSE_ADVANCE, ActionType.SET_INITIAL_BALANCE -> {
-                    Button(
-                        onClick = { onGoToTab(0) },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(8.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = KubMarineCobalt,
-                            contentColor = KubIceGlacier
-                        )
-                    ) {
-                        Text(
-                            "Перейти в Обзор",
-                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
-                        )
-                    }
-                }
-                ActionType.INFO -> { /* Informative advice only */ }
-            }
-        }
-    }
+private fun formatRate(rate: Float): String {
+    return if (rate % 1.0f == 0f) rate.toInt().toString() else String.format(java.util.Locale.US, "%.1f", rate)
 }

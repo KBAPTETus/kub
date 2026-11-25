@@ -4,6 +4,9 @@
 
     <!-- Local notifications for ENP tax dates (25th/28th) and cash gap alerts on Android 13+ -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Network permissions for Yandex Mobile Ads SDK -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
     <application
         android:name=".FinDirectorApplication"

@@ -12,11 +12,6 @@ import com.example.data.model.TaxRegime
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
-data class ImportSummary(
-    val importedCount: Int,
-    val skippedDuplicatesCount: Int
-)
-
 class FinanceRepository(
     private val transactionDao: TransactionDao,
     private val scheduledPaymentDao: ScheduledPaymentDao,
@@ -51,12 +46,10 @@ class FinanceRepository(
     suspend fun upsertTransaction(transaction: TransactionEntity): Long =
         transactionDao.upsert(transaction)
 
-    suspend fun importTransactions(transactions: List<TransactionEntity>): ImportSummary {
-        if (transactions.isEmpty()) return ImportSummary(0, 0)
-        val results = transactionDao.insertAllIgnoreDuplicates(transactions)
-        val imported = results.count { it != -1L }
-        val skipped = results.size - imported
-        return ImportSummary(importedCount = imported, skippedDuplicatesCount = skipped)
+    suspend fun importTransactions(transactions: List<TransactionEntity>): Int {
+        if (transactions.isEmpty()) return 0
+        val inserted = transactionDao.insertAllIgnoreDuplicates(transactions)
+        return inserted.count { it != -1L }
     }
 
     suspend fun setAdvanceClosed(id: Long, closed: Boolean) {
@@ -113,6 +106,45 @@ class FinanceRepository(
         )
     }
 
+    suspend fun updateRegionalTaxRates(
+        usnIncomeRatePercent: Float,
+        usnMarginRatePercent: Float,
+        npdRatePercent: Float,
+        annualPatentCostKopecks: Long
+    ) {
+        val current = getTaxProfileSnapshot()
+        taxProfileDao.upsertProfile(
+            current.copy(
+                usnIncomeRatePercent = usnIncomeRatePercent.coerceIn(0f, 100f),
+                usnMarginRatePercent = usnMarginRatePercent.coerceIn(0f, 100f),
+                npdRatePercent = npdRatePercent.coerceIn(0f, 100f),
+                annualPatentCostKopecks = annualPatentCostKopecks.coerceAtLeast(0L),
+                updatedAtMillis = System.currentTimeMillis()
+            )
+        )
+    }
+
+    suspend fun restoreBackup(
+        profile: TaxProfileEntity,
+        transactions: List<TransactionEntity>,
+        scheduledPayments: List<ScheduledPaymentEntity>,
+        taxPayments: List<TaxPaymentEntity>
+    ) {
+        transactionDao.deleteAll()
+        scheduledPaymentDao.deleteAll()
+        taxProfileDao.deleteAllTaxPayments()
+        taxProfileDao.upsertProfile(
+            profile.copy(
+                id = 1,
+                isOnboardingCompleted = true,
+                updatedAtMillis = System.currentTimeMillis()
+            )
+        )
+        transactions.forEach { transactionDao.upsert(it.copy(id = 0L)) }
+        scheduledPayments.forEach { scheduledPaymentDao.upsert(it.copy(id = 0L)) }
+        taxPayments.forEach { taxProfileDao.insertTaxPayment(it.copy(id = 0L)) }
+    }
+
     suspend fun setEnpRemindersEnabled(enabled: Boolean) {
         val current = getTaxProfileSnapshot()
         taxProfileDao.upsertProfile(
@@ -138,18 +170,32 @@ class FinanceRepository(
         taxProfileDao.deleteTaxPayment(id)
     }
 
+    suspend fun setDarkTheme(enabled: Boolean) {
+        val current = getTaxProfileSnapshot()
+        taxProfileDao.upsertProfile(
+            current.copy(
+                isDarkTheme = enabled,
+                updatedAtMillis = System.currentTimeMillis()
+            )
+        )
+    }
+
     suspend fun completeOnboarding(
         initialBalanceKopecks: Long,
         regime: TaxRegime,
         priorYearIncomeKopecks: Long,
-        recurringPayments: List<ScheduledPaymentEntity> = emptyList()
+        recurringPayments: List<ScheduledPaymentEntity> = emptyList(),
+        userName: String = "",
+        annualPatentCostKopecks: Long? = null
     ) {
         val current = getTaxProfileSnapshot()
         taxProfileDao.upsertProfile(
             current.copy(
+                userName = userName.trim(),
                 initialBalanceKopecks = initialBalanceKopecks.coerceAtLeast(0L),
                 regime = regime,
                 priorYearIncomeKopecks = priorYearIncomeKopecks.coerceAtLeast(0L),
+                annualPatentCostKopecks = annualPatentCostKopecks?.coerceAtLeast(0L) ?: current.annualPatentCostKopecks,
                 isOnboardingCompleted = true,
                 updatedAtMillis = System.currentTimeMillis()
             )
@@ -162,11 +208,15 @@ class FinanceRepository(
         regime: TaxRegime,
         priorYearIncomeKopecks: Long,
         annualPatentCostKopecks: Long,
-        enpRemindersEnabled: Boolean
+        enpRemindersEnabled: Boolean,
+        userName: String = "",
+        isDarkTheme: Boolean? = null
     ) {
         val current = getTaxProfileSnapshot()
         taxProfileDao.upsertProfile(
             current.copy(
+                userName = userName.trim(),
+                isDarkTheme = isDarkTheme ?: current.isDarkTheme,
                 initialBalanceKopecks = initialBalanceKopecks.coerceAtLeast(0L),
                 regime = regime,
                 priorYearIncomeKopecks = priorYearIncomeKopecks.coerceAtLeast(0L),
@@ -182,6 +232,21 @@ class FinanceRepository(
         val current = getTaxProfileSnapshot()
         taxProfileDao.upsertProfile(
             current.copy(
+                isOnboardingCompleted = false,
+                updatedAtMillis = System.currentTimeMillis()
+            )
+        )
+    }
+
+    suspend fun clearAllData() {
+        val keepDarkTheme = getTaxProfileSnapshot().isDarkTheme
+        transactionDao.deleteAll()
+        scheduledPaymentDao.deleteAll()
+        taxProfileDao.deleteAllTaxPayments()
+        taxProfileDao.upsertProfile(
+            TaxProfileEntity(
+                id = 1,
+                isDarkTheme = keepDarkTheme,
                 isOnboardingCompleted = false,
                 updatedAtMillis = System.currentTimeMillis()
             )

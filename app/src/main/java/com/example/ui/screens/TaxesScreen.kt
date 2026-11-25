@@ -1,29 +1,28 @@
 package com.example.ui.screens
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -33,294 +32,371 @@ import com.example.data.model.TaxRegime
 import com.example.domain.util.DateUtil
 import com.example.domain.util.MoneyFormatter
 import com.example.ui.MainUiState
+import com.example.ui.components.AeroGlassCard
 import com.example.ui.theme.KubAbyssNavy
-import com.example.ui.theme.KubDangerCoral
-import com.example.ui.theme.KubIceGlacier
 import com.example.ui.theme.KubMarineCobalt
 import com.example.ui.theme.KubOceanSurface
 import com.example.ui.theme.KubSafeAqua
-import com.example.ui.theme.KubSkyMarine
-import com.example.ui.theme.KubWarningAmber
-import com.example.ui.theme.KubWarningAmberContainer
+import com.example.ui.theme.LocalKubAeroTokens
 
 @Composable
 fun TaxesScreen(
     state: MainUiState,
     onSelectRegime: (TaxRegime) -> Unit,
+    onRecordTaxPaymentClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val tax = state.taxSummary
+    val tokens = LocalKubAeroTokens.current
 
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
             .padding(horizontal = 16.dp),
-        contentPadding = PaddingValues(vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        contentPadding = PaddingValues(top = 12.dp, bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        // Tax Reserve Hero Card
+        // Card 1: Tax Regime Switcher + Tax Reserve Piggy Bank (HTML lines 590-612)
         item {
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(1.dp, KubMarineCobalt.copy(alpha = 0.5f), RoundedCornerShape(20.dp)),
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = KubOceanSurface)
-            ) {
+            AeroGlassCard(cornerRadius = 24.dp) {
                 Column(
-                    modifier = Modifier.padding(20.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    Text(
-                        "НАЛОГОВАЯ КОПИЛКА (РЕЗЕРВ ПОД УПЛАТУ)",
-                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, letterSpacing = 1.sp),
-                        color = KubSkyMarine
-                    )
-
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(KubWarningAmberContainer)
-                            .border(1.dp, KubWarningAmber.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
-                            .padding(16.dp)
-                    ) {
-                        Column {
-                            Text(
-                                text = MoneyFormatter.formatRubles(tax.taxReserveKopecks),
-                                style = MaterialTheme.typography.headlineLarge.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    fontFamily = FontFamily.Monospace
-                                ),
-                                color = KubWarningAmber
-                            )
-                            Text(
-                                "Отложено из выручки под будущие авансовые платежи ЕНП",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = KubWarningAmber.copy(alpha = 0.9f)
-                            )
-                        }
-                    }
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Column {
-                            Text("Начислено за год", style = MaterialTheme.typography.labelSmall, color = KubSkyMarine)
-                            Text(
-                                MoneyFormatter.formatRubles(tax.accruedTaxKopecks),
-                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-                                color = KubIceGlacier
-                            )
-                        }
-                        Column(horizontalAlignment = Alignment.End) {
-                            Text("Фактически уплачено", style = MaterialTheme.typography.labelSmall, color = KubSkyMarine)
-                            Text(
-                                MoneyFormatter.formatRubles(tax.paidTaxKopecks),
-                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-                                color = KubSafeAqua
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        // Tax Regime Selector Card
-        item {
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(1.dp, KubMarineCobalt.copy(alpha = 0.4f), RoundedCornerShape(16.dp)),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = KubOceanSurface)
-            ) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(
-                        "РЕЖИМ НАЛОГООБЛОЖЕНИЯ",
-                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                        color = KubSkyMarine
-                    )
-
-                    TaxRegime.entries.forEach { regime ->
-                        val isSelected = regime == state.taxProfile.regime
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .border(
-                                    1.dp,
-                                    if (isSelected) KubIceGlacier.copy(alpha = 0.6f) else KubMarineCobalt.copy(alpha = 0.2f),
-                                    RoundedCornerShape(10.dp)
-                                )
-                                .clickable { onSelectRegime(regime) },
-                            shape = RoundedCornerShape(10.dp),
-                            colors = CardDefaults.cardColors(
-                                containerColor = if (isSelected) KubAbyssNavy else Color.Transparent
-                            )
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(12.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        regime.fullTitle,
-                                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-                                        color = if (isSelected) KubIceGlacier else KubSkyMarine
-                                    )
-                                    Text(
-                                        regime.description,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = KubSkyMarine.copy(alpha = 0.8f)
-                                    )
-                                }
-                                if (isSelected) {
-                                    Box(
-                                        modifier = Modifier
-                                            .clip(RoundedCornerShape(4.dp))
-                                            .background(KubIceGlacier)
-                                            .padding(horizontal = 8.dp, vertical = 2.dp)
-                                    ) {
-                                        Text(
-                                            "АКТИВЕН",
-                                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                            color = KubAbyssNavy
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // 60M Limit Card (Tax Reform)
-        item {
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(1.dp, KubMarineCobalt.copy(alpha = 0.4f), RoundedCornerShape(16.dp)),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = KubOceanSurface)
-            ) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            "ПОРОГ НДС (РЕФОРМА 60 МЛН ₽)",
-                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                            color = KubSkyMarine
+                            text = "НАЛОГОВЫЙ РЕЖИМ",
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                fontWeight = FontWeight.ExtraBold,
+                                letterSpacing = 0.8.sp
+                            ),
+                            color = tokens.textSub
+                        )
+                        Box(
+                            modifier = Modifier
+                                .clip(CircleShape)
+                                .background(tokens.warningBg)
+                                .padding(horizontal = 10.dp, vertical = 3.dp)
+                        ) {
+                            Text(
+                                text = "ЕНС • Кассовый метод",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.Bold
+                                ),
+                                color = tokens.warningColor
+                            )
+                        }
+                    }
+
+                    // 4-tab regime selector (2x2 compact rows so labels never clip)
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(tokens.pillBg)
+                            .padding(5.dp),
+                        verticalArrangement = Arrangement.spacedBy(5.dp)
+                    ) {
+                        TaxRegime.entries.chunked(2).forEach { rowItems ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                rowItems.forEach { regime ->
+                                    val isSelected = regime == state.taxProfile.regime
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(if (isSelected) KubOceanSurface else Color.Transparent)
+                                            .clickable { onSelectRegime(regime) }
+                                            .padding(vertical = 8.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = regime.shortTitle,
+                                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                                            color = if (isSelected) Color.White else tokens.textSub,
+                                            maxLines = 1
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Inner reserve box with golden currency emblem
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(tokens.cardInner)
+                            .padding(14.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text(
+                                text = "Накоплено в налоговой копилке",
+                                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                                color = tokens.textSub
+                            )
+                            Text(
+                                text = MoneyFormatter.formatRubles(tax.taxReserveKopecks),
+                                style = MaterialTheme.typography.headlineSmall.copy(
+                                    fontWeight = FontWeight.ExtraBold,
+                                    fontFamily = FontFamily.Monospace
+                                ),
+                                color = tokens.textMain
+                            )
+                            Text(
+                                text = when (state.taxProfile.regime) {
+                                    TaxRegime.USN_6 -> "${state.taxProfile.usnIncomeRatePercent}% от выручки с учётом авансов"
+                                    TaxRegime.USN_15 -> "${state.taxProfile.usnMarginRatePercent}% от маржи (мин. 1%)"
+                                    TaxRegime.PATENT -> "Пропорциональный резерв годового патента"
+                                    TaxRegime.NPD -> "${state.taxProfile.npdRatePercent}% от поступлений (самозанятый)"
+                                },
+                                style = MaterialTheme.typography.labelSmall,
+                                color = tokens.textMuted
+                            )
+                            if (tax.paidTaxKopecks > 0L) {
+                                Text(
+                                    text = "Уплачено за год: ${MoneyFormatter.formatRubles(tax.paidTaxKopecks)}",
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        fontFamily = FontFamily.Monospace
+                                    ),
+                                    color = tokens.safeColor
+                                )
+                            }
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .size(44.dp)
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(
+                                    Brush.verticalGradient(
+                                        listOf(Color(0xFFFDE68A), Color(0xFFF59E0B))
+                                    )
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "₽",
+                                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.ExtraBold),
+                                color = KubAbyssNavy
+                            )
+                        }
+                    }
+
+                    // Record tax payment action
+                    com.example.ui.components.AeroPrimaryButton(
+                        text = "Зафиксировать уплату налога",
+                        onClick = onRecordTaxPaymentClick,
+                        modifier = Modifier.fillMaxWidth(),
+                        contentPadding = PaddingValues(vertical = 11.dp)
+                    )
+                }
+            }
+        }
+
+        // Native RSY Ad Card between Tax Regime and VAT Threshold
+        item {
+            com.example.ui.components.KubNativeAdCard(
+                adUnitId = com.example.ads.KubAdConfig.nativeAdUnitId
+            )
+        }
+
+        // Card 2: VAT 60M Threshold (HTML lines 614-626)
+        item {
+            val pct = (tax.limit60mProgressPercent * 100f).coerceIn(0f, 100f)
+            AeroGlassCard(cornerRadius = 24.dp) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = if (state.taxProfile.regime == TaxRegime.NPD) {
+                                "Лимит самозанятого (НПД)"
+                            } else {
+                                "Порог освобождения от НДС"
+                            },
+                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.ExtraBold),
+                            color = tokens.textMain
                         )
                         Text(
-                            "${(tax.limit60mProgressPercent * 100).toInt()}%",
-                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                            color = if (tax.limit60mProgressPercent > 0.8f) KubDangerCoral else KubIceGlacier
+                            text = String.format(java.util.Locale.US, "%.1f%%", pct),
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.ExtraBold
+                            ),
+                            color = tokens.textSub
                         )
                     }
 
-                    LinearProgressIndicator(
-                        progress = { tax.limit60mProgressPercent },
+                    Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(10.dp)
-                            .clip(RoundedCornerShape(5.dp)),
-                        color = if (tax.limit60mProgressPercent > 0.8f) KubDangerCoral else KubIceGlacier,
-                        trackColor = KubAbyssNavy
-                    )
+                            .height(14.dp)
+                            .clip(CircleShape)
+                            .background(tokens.pillBg)
+                            .padding(2.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth((pct / 100f).coerceIn(0.03f, 1f))
+                                .fillMaxHeight()
+                                .clip(CircleShape)
+                                .background(
+                                    Brush.horizontalGradient(
+                                        colors = listOf(KubMarineCobalt, KubSafeAqua, KubOceanSurface)
+                                    )
+                                )
+                        )
+                    }
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
-                            "Выручка: ${MoneyFormatter.formatCompactRubles(tax.totalYearRevenueKopecks)}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = KubSkyMarine
+                            text = "Выручка: ${MoneyFormatter.formatRubles(tax.totalYearRevenueKopecks)}",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.SemiBold
+                            ),
+                            color = tokens.textSub
                         )
                         Text(
-                            "Осталось: ${MoneyFormatter.formatCompactRubles(tax.remainingTo60mKopecks)}",
-                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
-                            color = KubIceGlacier
+                            text = "Лимит: ${MoneyFormatter.formatRubles(tax.annualLimitKopecks)}",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.SemiBold
+                            ),
+                            color = tokens.textSub
                         )
                     }
-
-                    Text(
-                        "При выручке свыше 60 млн ₽ в год у бизнеса на УСН возникает обязанность платить НДС (5% без вычетов или 20% с вычетами).",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = KubSkyMarine.copy(alpha = 0.8f)
-                    )
                 }
             }
         }
 
-        // ENP Calendar Dates (25th and 28th)
+        // Card 3: ENP Dates (HTML lines 628-646)
         item {
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(1.dp, KubMarineCobalt.copy(alpha = 0.4f), RoundedCornerShape(16.dp)),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = KubOceanSurface)
-            ) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            AeroGlassCard(cornerRadius = 24.dp) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
                     Text(
-                        "КАЛЕНДАРЬ ЕНП (ФНС)",
-                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                        color = KubSkyMarine
+                        text = "БЛИЖАЙШИЕ ДАТЫ ЕНС",
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            fontWeight = FontWeight.ExtraBold,
+                            letterSpacing = 0.8.sp
+                        ),
+                        color = tokens.textSub
                     )
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Card(
-                            modifier = Modifier
-                                .weight(1f)
-                                .border(1.dp, KubMarineCobalt.copy(alpha = 0.3f), RoundedCornerShape(10.dp)),
-                            shape = RoundedCornerShape(10.dp),
-                            colors = CardDefaults.cardColors(containerColor = KubAbyssNavy)
-                        ) {
-                            Column(modifier = Modifier.padding(12.dp)) {
-                                Text("25-е число", style = MaterialTheme.typography.labelSmall, color = KubIceGlacier)
-                                Text("Уведомление ЕНС", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold), color = KubIceGlacier)
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    "Через ${DateUtil.daysRu(tax.daysUntilEnpNotice)}",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = if (tax.daysUntilEnpNotice <= 3) KubWarningAmber else KubSkyMarine
-                                )
-                            }
-                        }
-
-                        Card(
-                            modifier = Modifier
-                                .weight(1f)
-                                .border(1.dp, KubMarineCobalt.copy(alpha = 0.3f), RoundedCornerShape(10.dp)),
-                            shape = RoundedCornerShape(10.dp),
-                            colors = CardDefaults.cardColors(containerColor = KubAbyssNavy)
-                        ) {
-                            Column(modifier = Modifier.padding(12.dp)) {
-                                Text("28-е число", style = MaterialTheme.typography.labelSmall, color = KubWarningAmber)
-                                Text("Списание налога", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold), color = KubIceGlacier)
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    "Через ${DateUtil.daysRu(tax.daysUntilEnpPayment)}",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = if (tax.daysUntilEnpPayment <= 3) KubDangerCoral else KubSkyMarine
-                                )
-                            }
+                        if (state.taxProfile.regime == TaxRegime.NPD) {
+                            EnpDateBox(
+                                dayTitle = DateUtil.formatShort(tax.nextEnpPaymentDateEpochDay),
+                                daysLeftText = "через ${DateUtil.daysRu(tax.daysUntilEnpPayment)}",
+                                subtitle = "Ежемесячная уплата НПД (до 28 числа)",
+                                dayColor = tokens.warningColor,
+                                badgeBg = tokens.warningBg,
+                                badgeColor = tokens.warningColor,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        } else {
+                            EnpDateBox(
+                                dayTitle = DateUtil.formatShort(tax.nextEnpNoticeDateEpochDay),
+                                daysLeftText = "через ${DateUtil.daysRu(tax.daysUntilEnpNotice)}",
+                                subtitle = "Квартальное уведомление ЕНС (25 число)",
+                                dayColor = tokens.textMain,
+                                badgeBg = KubMarineCobalt.copy(alpha = 0.2f),
+                                badgeColor = tokens.textSub,
+                                modifier = Modifier.weight(1f)
+                            )
+                            EnpDateBox(
+                                dayTitle = DateUtil.formatShort(tax.nextEnpPaymentDateEpochDay),
+                                daysLeftText = "через ${DateUtil.daysRu(tax.daysUntilEnpPayment)}",
+                                subtitle = "Квартальный платёж ЕНП (28 число)",
+                                dayColor = tokens.warningColor,
+                                badgeBg = tokens.warningBg,
+                                badgeColor = tokens.warningColor,
+                                modifier = Modifier.weight(1f)
+                            )
                         }
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun EnpDateBox(
+    dayTitle: String,
+    daysLeftText: String,
+    subtitle: String,
+    dayColor: Color,
+    badgeBg: Color,
+    badgeColor: Color,
+    modifier: Modifier = Modifier
+) {
+    val tokens = LocalKubAeroTokens.current
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(16.dp))
+            .background(tokens.cardInner)
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(5.dp)
+    ) {
+        Text(
+            text = dayTitle,
+            style = MaterialTheme.typography.titleSmall.copy(
+                fontWeight = FontWeight.ExtraBold,
+                fontFamily = FontFamily.Monospace
+            ),
+            color = dayColor,
+            maxLines = 1,
+            softWrap = false
+        )
+        Box(
+            modifier = Modifier
+                .clip(CircleShape)
+                .background(badgeBg)
+                .padding(horizontal = 8.dp, vertical = 2.dp)
+        ) {
+            Text(
+                text = daysLeftText,
+                style = MaterialTheme.typography.labelSmall.copy(
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold
+                ),
+                color = badgeColor,
+                maxLines = 1,
+                softWrap = false
+            )
+        }
+        Text(
+            text = subtitle,
+            style = MaterialTheme.typography.labelSmall,
+            color = tokens.textMuted
+        )
     }
 }

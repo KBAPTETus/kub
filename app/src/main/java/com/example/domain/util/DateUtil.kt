@@ -56,6 +56,14 @@ object DateUtil {
 
     fun dayOfMonthOf(epochDay: Long): Int = fromEpochDay(epochDay).third
 
+    fun daysInMonth(year: Int, month1To12: Int): Int {
+        val cal = GregorianCalendar(TimeZone.getTimeZone("UTC")).apply {
+            clear()
+            set(year, month1To12 - 1, 1)
+        }
+        return cal.getActualMaximum(Calendar.DAY_OF_MONTH)
+    }
+
     fun addMonths(epochDay: Long, months: Int): Long {
         val (year, month, day) = fromEpochDay(epochDay)
         val cal = GregorianCalendar(TimeZone.getTimeZone("UTC")).apply {

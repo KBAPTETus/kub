@@ -46,7 +46,7 @@ class FinDirectorConverters {
         TaxProfileEntity::class,
         TaxPaymentEntity::class
     ],
-    version = 1,
+    version = 3,
     exportSchema = false
 )
 @TypeConverters(FinDirectorConverters::class)
@@ -58,6 +58,21 @@ abstract class FinDirectorDatabase : RoomDatabase() {
     companion object {
         private const val TAG = "FinDirectorDatabase"
         private const val DB_NAME = "findirector_encrypted.db"
+
+        val MIGRATION_1_2 = object : androidx.room.migration.Migration(1, 2) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE tax_profile ADD COLUMN userName TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE tax_profile ADD COLUMN isDarkTheme INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
+        val MIGRATION_2_3 = object : androidx.room.migration.Migration(2, 3) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE tax_profile ADD COLUMN usnIncomeRatePercent REAL NOT NULL DEFAULT 6.0")
+                db.execSQL("ALTER TABLE tax_profile ADD COLUMN usnMarginRatePercent REAL NOT NULL DEFAULT 15.0")
+                db.execSQL("ALTER TABLE tax_profile ADD COLUMN npdRatePercent REAL NOT NULL DEFAULT 6.0")
+            }
+        }
 
         @Volatile
         private var instance: FinDirectorDatabase? = null
@@ -93,6 +108,7 @@ abstract class FinDirectorDatabase : RoomDatabase() {
             }
 
             return builder
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                 .fallbackToDestructiveMigration(dropAllTables = true)
                 .build()
         }

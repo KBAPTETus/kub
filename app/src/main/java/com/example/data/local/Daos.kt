@@ -26,6 +26,9 @@ interface TransactionDao {
 
     @Query("DELETE FROM transactions WHERE id = :id")
     suspend fun deleteById(id: Long)
+
+    @Query("DELETE FROM transactions")
+    suspend fun deleteAll()
 }
 
 @Dao
@@ -50,6 +53,9 @@ interface ScheduledPaymentDao {
 
     @Query("DELETE FROM scheduled_payments WHERE id = :id")
     suspend fun deleteById(id: Long)
+
+    @Query("DELETE FROM scheduled_payments")
+    suspend fun deleteAll()
 }
 
 @Dao
@@ -74,4 +80,7 @@ interface TaxProfileDao {
 
     @Query("DELETE FROM tax_payments WHERE id = :id")
     suspend fun deleteTaxPayment(id: Long)
+
+    @Query("DELETE FROM tax_payments")
+    suspend fun deleteAllTaxPayments()
 }

@@ -44,7 +44,8 @@ data class TaxSummary(
     val nextEnpNoticeDateEpochDay: Long,
     val daysUntilEnpNotice: Int,
     val nextEnpPaymentDateEpochDay: Long,
-    val daysUntilEnpPayment: Int
+    val daysUntilEnpPayment: Int,
+    val annualLimitKopecks: Long = 60_000_000_00L
 )
 
 enum class RiskLevel {

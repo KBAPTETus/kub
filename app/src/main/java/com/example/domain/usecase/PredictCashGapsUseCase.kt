@@ -97,8 +97,9 @@ class PredictCashGapsUseCase {
             }
             PaymentRecurrence.MONTHLY -> {
                 val targetDay = DateUtil.dayOfMonthOf(payment.dueDateEpochDay)
-                val currentMonthDay = DateUtil.dayOfMonthOf(currentDay)
-                currentMonthDay == targetDay
+                val (year, month, currentMonthDay) = DateUtil.fromEpochDay(currentDay)
+                val maxDayInMonth = DateUtil.daysInMonth(year, month)
+                currentMonthDay == minOf(targetDay, maxDayInMonth)
             }
         }
     }

@@ -1,10 +1,13 @@
 package com.example.ui.dialogs
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -36,28 +39,48 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.data.local.TransactionEntity
 import com.example.data.model.PaymentDirection
 import com.example.data.model.PaymentRecurrence
 import com.example.data.model.TransactionType
-import com.example.data.repository.ImportSummary
 import com.example.domain.util.DateUtil
 import com.example.domain.util.MoneyFormatter
 
 @Composable
 fun AddTransactionDialog(
     initialType: TransactionType,
+    existingTransaction: TransactionEntity? = null,
     onDismiss: () -> Unit,
     onConfirm: (amountKopecks: Long, type: TransactionType, counterparty: String, category: String, dateEpochDay: Long) -> Unit
 ) {
-    var amountText by remember { mutableStateOf("") }
-    var counterparty by remember { mutableStateOf("") }
-    var category by remember { mutableStateOf("") }
-    var selectedType by remember { mutableStateOf(initialType) }
-    var dateText by remember { mutableStateOf(DateUtil.formatDdMmYyyy(DateUtil.todayEpochDay())) }
+    var amountText by remember(existingTransaction) {
+        mutableStateOf(
+            existingTransaction?.let { (it.amountKopecks / 100L).toString() }.orEmpty()
+        )
+    }
+    var counterparty by remember(existingTransaction) {
+        mutableStateOf(existingTransaction?.counterparty.orEmpty())
+    }
+    var category by remember(existingTransaction) {
+        mutableStateOf(existingTransaction?.category.orEmpty())
+    }
+    var selectedType by remember(existingTransaction) {
+        mutableStateOf(existingTransaction?.type ?: initialType)
+    }
+    var dateText by remember(existingTransaction) {
+        mutableStateOf(
+            DateUtil.formatDdMmYyyy(existingTransaction?.dateEpochDay ?: DateUtil.todayEpochDay())
+        )
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Новая операция", style = MaterialTheme.typography.titleLarge) },
+        title = {
+            Text(
+                if (existingTransaction == null) "Новая операция" else "Редактировать операцию",
+                style = MaterialTheme.typography.titleLarge
+            )
+        },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 // Type selector
@@ -143,21 +166,38 @@ fun AddTransactionDialog(
     )
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun AddScheduledPaymentDialog(
+    existingPayment: com.example.data.local.ScheduledPaymentEntity? = null,
     onDismiss: () -> Unit,
     onConfirm: (title: String, amountKopecks: Long, direction: PaymentDirection, dueDateEpochDay: Long, recurrence: PaymentRecurrence, category: String) -> Unit
 ) {
-    var title by remember { mutableStateOf("") }
-    var amountText by remember { mutableStateOf("") }
-    var direction by remember { mutableStateOf(PaymentDirection.OUTFLOW) }
-    var recurrence by remember { mutableStateOf(PaymentRecurrence.MONTHLY) }
-    var dueDateText by remember { mutableStateOf(DateUtil.formatDdMmYyyy(DateUtil.todayEpochDay() + 5)) }
-    var category by remember { mutableStateOf("") }
+    var title by remember(existingPayment) { mutableStateOf(existingPayment?.title ?: "") }
+    var amountText by remember(existingPayment) {
+        mutableStateOf(
+            if (existingPayment != null && existingPayment.amountKopecks > 0L)
+                (existingPayment.amountKopecks / 100L).toString()
+            else ""
+        )
+    }
+    var direction by remember(existingPayment) { mutableStateOf(existingPayment?.direction ?: PaymentDirection.OUTFLOW) }
+    var recurrence by remember(existingPayment) { mutableStateOf(existingPayment?.recurrence ?: PaymentRecurrence.MONTHLY) }
+    var dueDateText by remember(existingPayment) {
+        mutableStateOf(
+            DateUtil.formatDdMmYyyy(existingPayment?.dueDateEpochDay ?: (DateUtil.todayEpochDay() + 5))
+        )
+    }
+    var category by remember(existingPayment) { mutableStateOf(existingPayment?.category ?: "") }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Плановый платеж в Радар", style = MaterialTheme.typography.titleLarge) },
+        title = {
+            Text(
+                if (existingPayment != null) "Редактировать платеж" else "Плановый платеж в Радар",
+                style = MaterialTheme.typography.titleLarge
+            )
+        },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Row(
@@ -212,21 +252,36 @@ fun AddScheduledPaymentDialog(
                 )
 
                 Text("Периодичность:", style = MaterialTheme.typography.bodyMedium)
-                Row(
+                FlowRow(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     PaymentRecurrence.entries.forEach { rec ->
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.clickable { recurrence = rec }
+                        val isSelected = recurrence == rec
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(
+                                    if (isSelected) MaterialTheme.colorScheme.primary
+                                    else MaterialTheme.colorScheme.surfaceVariant
+                                )
+                                .border(
+                                    1.dp,
+                                    if (isSelected) MaterialTheme.colorScheme.primary
+                                    else MaterialTheme.colorScheme.outline,
+                                    RoundedCornerShape(10.dp)
+                                )
+                                .clickable { recurrence = rec }
+                                .padding(horizontal = 12.dp, vertical = 7.dp)
                         ) {
-                            RadioButton(
-                                selected = recurrence == rec,
-                                onClick = { recurrence = rec },
-                                colors = RadioButtonDefaults.colors(selectedColor = MaterialTheme.colorScheme.primary)
+                            Text(
+                                text = rec.labelRu,
+                                color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
+                                maxLines = 1,
+                                softWrap = false
                             )
-                            Text(rec.labelRu, style = MaterialTheme.typography.bodySmall)
                         }
                     }
                 }
@@ -242,7 +297,7 @@ fun AddScheduledPaymentDialog(
                     }
                 }
             ) {
-                Text("Добавить в график")
+                Text(if (existingPayment != null) "Сохранить" else "Добавить в график")
             }
         },
         dismissButton = {
@@ -298,36 +353,66 @@ fun InitialBalanceDialog(
 }
 
 @Composable
-fun ImportSummaryDialog(
-    summary: ImportSummary,
-    onDismiss: () -> Unit
+fun RecordTaxPaymentDialog(
+    suggestedAmountKopecks: Long,
+    onDismiss: () -> Unit,
+    onConfirm: (amountKopecks: Long, dateEpochDay: Long, note: String) -> Unit
 ) {
+    var amountText by remember(suggestedAmountKopecks) {
+        mutableStateOf(if (suggestedAmountKopecks > 0L) (suggestedAmountKopecks / 100L).toString() else "")
+    }
+    var dateText by remember { mutableStateOf(DateUtil.formatDdMmYyyy(DateUtil.todayEpochDay())) }
+    var note by remember { mutableStateOf("Уплата ЕНС / налога") }
+
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Импорт выписки 1С завершен", style = MaterialTheme.typography.titleLarge) },
+        title = { Text("Зафиксировать уплату налога", style = MaterialTheme.typography.titleLarge) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
-                    "Загружено новых операций: ${summary.importedCount}",
-                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold),
-                    color = MaterialTheme.colorScheme.primary
-                )
-                if (summary.skippedDuplicatesCount > 0) {
-                    Text(
-                        "Пропущено дубликатов: ${summary.skippedDuplicatesCount}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                Text(
-                    "Safe-to-Spend, налоговая копилка и график кассовых разрывов автоматически пересчитаны.",
+                    "После сохранения сумма уменьшит налоговую копилку и обновит фактический остаток на счёте.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                OutlinedTextField(
+                    value = amountText,
+                    onValueChange = { amountText = it },
+                    label = { Text("Сумма уплаты (₽)") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    value = dateText,
+                    onValueChange = { dateText = it },
+                    label = { Text("Дата (ДД.ММ.ГГГГ)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    value = note,
+                    onValueChange = { note = it },
+                    label = { Text("Комментарий") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
                 )
             }
         },
         confirmButton = {
-            Button(onClick = onDismiss) { Text("Понятно") }
+            Button(
+                onClick = {
+                    val kopecks = MoneyFormatter.parseRublesToKopecks(amountText)
+                    val date = DateUtil.parseDdMmYyyy(dateText) ?: DateUtil.todayEpochDay()
+                    if (kopecks != null && kopecks > 0L) {
+                        onConfirm(kopecks, date, note.trim())
+                    }
+                }
+            ) {
+                Text("Зафиксировать")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Отмена") }
         }
     )
 }

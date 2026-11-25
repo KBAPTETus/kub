@@ -2,13 +2,11 @@ package com.example.domain.usecase
 
 import com.example.data.local.TaxProfileEntity
 import com.example.data.local.TransactionEntity
-import com.example.data.model.TaxRegime
 import com.example.data.model.TransactionType
 import com.example.domain.util.DateUtil
 import java.io.OutputStream
 import java.io.OutputStreamWriter
 import java.util.Locale
-import kotlin.math.max
 
 class ExportPnlCsvUseCase {
 
@@ -25,25 +23,28 @@ class ExportPnlCsvUseCase {
         writer.write("Налоговый режим:;${taxProfile.regime.fullTitle}\n")
         writer.write("Дата выгрузки:;${DateUtil.formatDdMmYyyy(DateUtil.todayEpochDay())}\n\n")
 
-        writer.write("Период;Выручка (₽);Расходы (₽);Операционная прибыль (₽);Налоговый резерв (₽);Чистая прибыль (₽)\n")
+        writer.write("Период;Выручка (₽);Незакрытые авансы (₽);Расходы (₽);Операционная прибыль (₽);Налоговый резерв (₽);Чистая прибыль (₽)\n")
 
-        // Group by Year and Month
-        val grouped = transactions.groupBy {
-            val year = DateUtil.yearOf(it.dateEpochDay)
-            val month = DateUtil.monthOf(it.dateEpochDay)
-            year to month
+        val byMonth = transactions.groupBy { tx ->
+            val (y, m, _) = DateUtil.fromEpochDay(tx.dateEpochDay)
+            y to m
         }.toSortedMap(compareBy({ it.first }, { it.second }))
 
-        var grandTotalRevenue = 0L
-        var grandTotalExpenses = 0L
-        var grandTotalTax = 0L
+        var grandRevenue = 0L
+        var grandUnclosedAdvances = 0L
+        var grandExpenses = 0L
+        var grandTax = 0L
 
-        for ((period, txs) in grouped) {
-            val (year, month) = period
+        for ((ym, txs) in byMonth) {
+            val (year, month) = ym
             val periodLabel = DateUtil.formatMonthYear(year, month)
 
             val revenue = txs.filter {
-                it.type == TransactionType.INCOME || it.type == TransactionType.CLIENT_ADVANCE
+                it.type == TransactionType.INCOME || (it.type == TransactionType.CLIENT_ADVANCE && it.isAdvanceClosed)
+            }.sumOf { it.amountKopecks }
+
+            val unclosedAdvances = txs.filter {
+                it.type == TransactionType.CLIENT_ADVANCE && !it.isAdvanceClosed
             }.sumOf { it.amountKopecks }
 
             val expenses = txs.filter {
@@ -51,28 +52,34 @@ class ExportPnlCsvUseCase {
             }.sumOf { it.amountKopecks }
 
             val opProfit = revenue - expenses
+            val cashInflowForTax = revenue + unclosedAdvances
 
-            val periodTax = when (taxProfile.regime) {
-                TaxRegime.USN_6 -> (revenue * 6L) / 100L
-                TaxRegime.USN_15 -> {
-                    val margin = max(0L, opProfit)
-                    max((margin * 15L) / 100L, (revenue * 1L) / 100L)
-                }
-                TaxRegime.PATENT -> taxProfile.annualPatentCostKopecks / 12L
+            val periodTax = if (taxProfile.regime == com.example.data.model.TaxRegime.PATENT) {
+                taxProfile.annualPatentCostKopecks / 12L
+            } else {
+                TaxCalculator.calculateTaxAmount(
+                    regime = taxProfile.regime,
+                    revenueKopecks = cashInflowForTax,
+                    expensesKopecks = expenses,
+                    profile = taxProfile,
+                    monthsElapsed = 1
+                )
             }
 
             val netProfit = opProfit - periodTax
 
-            grandTotalRevenue += revenue
-            grandTotalExpenses += expenses
-            grandTotalTax += periodTax
+            grandRevenue += revenue
+            grandUnclosedAdvances += unclosedAdvances
+            grandExpenses += expenses
+            grandTax += periodTax
 
             writer.write(
                 String.format(
                     Locale.US,
-                    "%s;%.2f;%.2f;%.2f;%.2f;%.2f\n",
+                    "%s;%.2f;%.2f;%.2f;%.2f;%.2f;%.2f\n",
                     periodLabel,
                     revenue / 100.0,
+                    unclosedAdvances / 100.0,
                     expenses / 100.0,
                     opProfit / 100.0,
                     periodTax / 100.0,
@@ -81,22 +88,22 @@ class ExportPnlCsvUseCase {
             )
         }
 
-        val grandOpProfit = grandTotalRevenue - grandTotalExpenses
-        val grandNetProfit = grandOpProfit - grandTotalTax
+        val grandOpProfit = grandRevenue - grandExpenses
+        val grandNetProfit = grandOpProfit - grandTax
 
         writer.write("\n")
         writer.write(
             String.format(
                 Locale.US,
-                "ИТОГО ЗА ВСЕ ВРЕМЯ;%.2f;%.2f;%.2f;%.2f;%.2f\n",
-                grandTotalRevenue / 100.0,
-                grandTotalExpenses / 100.0,
+                "ИТОГО ЗА ВСЕ ВРЕМЯ;%.2f;%.2f;%.2f;%.2f;%.2f;%.2f\n",
+                grandRevenue / 100.0,
+                grandUnclosedAdvances / 100.0,
+                grandExpenses / 100.0,
                 grandOpProfit / 100.0,
-                grandTotalTax / 100.0,
+                grandTax / 100.0,
                 grandNetProfit / 100.0
             )
         )
-
         writer.flush()
     }
 }
